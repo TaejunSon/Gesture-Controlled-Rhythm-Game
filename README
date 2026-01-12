@@ -1,1 +1,26 @@
 🎮Gesture Controlled Rhythm Game🎮
+
+#세팅 방법
+1. Repository를 저장할 폴더에서 git bash 혹은 다른 shell을 통해 파이썬 venv를 만든다.
+    Reference website 참조
+'''
+python -m venv '가상환경 이름'
+'''
+2. 같은 폴더에서 Repository를 clone한다.
+'''git clone https://github.com/TaejunSon/Gesture-Controlled-Rhythm-Game'''
+3. 가상환경을 실행한다(아래 코드는 bash 기준)
+'''source '가상환경 이름'/Scripts/activate'''
+4. Repository로 이동 후 아래 코드를 실행한다.
+''' cd Gesture-Controlled-Rhythm-Game
+    pip install -r requirements.txt
+'''
+5. VS Code에서 폴더를 열고 하고 싶은 일을 한다.
+6. 적용된 것을 보고싶으면 첫 번째 sondream 폴더에서 아래 코드를 실행하고 http://127.0.0.1:8000/로 접속한다(별 일 없으면 앞의 링크와 같을 것)
+'''python manage.py runserver'''
+6. 필요한 패키지를 pip를 통해 설치하였다면, Repository main에서 git push 전 아래 코드를 실행한다.
+'''pip freeze > requirements.txt'''
+7. 작업 후 deactivate를 통해 가상환경을 종료한다.
+
+
+#사용 방법
+자세한 사용법은 아래 블로그를 참조시면 좋을 것 같습니다.
