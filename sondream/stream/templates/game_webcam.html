@@ -1,68 +1,256 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="utf-8">
     <title>Webcam Rhythm Game</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@400;700&display=swap"
+        rel="stylesheet">
+
     <style>
-        body { margin: 0; padding: 0; background-color: #222; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; }
-        .container { position: relative; width: 640px; height: 480px; margin-top: 20px; border: 3px solid #444; border-radius: 10px; overflow: hidden; background: #000; }
+        body {
+            margin: 0;
+            padding: 0;
+            background: radial-gradient(circle at center, #2a2a2a, #000);
+            color: white;
+            font-family: 'Roboto', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            justify-content: center;
+        }
 
-        #input_video { display: none; }
-        #output_canvas { width: 100%; height: 100%; transform: scaleX(-1); /* 거울 모드 */ }
+        h2 {
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 2px;
+            color: #00ffff;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+            margin-bottom: 20px;
+            margin-top: 0 !important;
+        }
 
-        /* UI 레이어 */
-        #ui-layer { position: absolute; top: 15px; left: 15px; z-index: 10; text-shadow: 2px 2px 2px black; pointer-events: none; }
-        .info-label { font-size: 14px; color: #aaa; margin-bottom: 2px; margin-top: 10px; }
-        .info-label:first-child { margin-top: 0; }
-        .info-value { font-size: 20px; font-weight: bold; margin-bottom: 5px; transition: color 0.2s; }
-        .score-value { font-size: 32px; font-weight: bold; color: #00ff00; }
+        .container {
+            position: relative;
+            width: 640px;
+            height: 480px;
+            border: 2px solid #555;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #000;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.15);
+        }
 
-        /* 콤보 애니메이션 */
-        .pop-anim { animation: pop 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.5); color: #fff; } 100% { transform: scale(1); } }
+        #input_video {
+            display: none;
+        }
+
+        #output_canvas {
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+        }
+
+        /* UI 패널 공통 스타일 */
+        .hud-panel {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #ui-layer {
+            top: 15px;
+            left: 15px;
+            width: 140px;
+            padding: 10px;
+        }
+
+        #stats-layer {
+            bottom: 15px;
+            left: 15px;
+            text-align: left;
+            min-width: 120px;
+            padding: 10px;
+        }
+
+        .info-label {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px;
+            color: #888;
+            margin-bottom: 2px;
+            margin-top: 8px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .info-label:first-child {
+            margin-top: 0;
+        }
+
+        .info-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: #fff;
+        }
+
+        .score-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 28px;
+            font-weight: 900;
+            background: linear-gradient(180deg, #fff, #00ff00);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 5px rgba(0, 255, 0, 0.5));
+        }
+
+        #combo {
+            transition: transform 0.1s;
+        }
+
+        .pop-anim {
+            animation: pop 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* 랭크 스타일 */
+        #rank {
+            font-size: 32px;
+            color: #ffaa00;
+            text-shadow: 0 0 15px rgba(255, 170, 0, 0.6);
+        }
 
         /* 피버 게이지 */
-        #fever-container { width: 150px; height: 12px; background: #333; border: 2px solid #666; border-radius: 6px; overflow: hidden; margin-top: 5px; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
-        #fever-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #ffaa00, #ffff00); transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .fever-active-mode #fever-bar { background: linear-gradient(90deg, #00c6ff, #0072ff); box-shadow: 0 0 15px #00c6ff; animation: pulse-fever 0.5s infinite alternate; }
-        .fever-active-text { color: #00c6ff !important; text-shadow: 0 0 10px #00c6ff !important; animation: pulse-text 0.5s infinite alternate; }
-        @keyframes pulse-fever { from { opacity: 0.8; } to { opacity: 1.0; box-shadow: 0 0 20px #00c6ff; } }
-        @keyframes pulse-text { from { transform: scale(1); } to { transform: scale(1.1); } }
+        #fever-container {
+            width: 100%;
+            height: 8px;
+            background: #222;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.8);
+        }
 
-        /* 통계 스타일 */
-        #stats-layer { position: absolute; top: 15px; right: 15px; z-index: 10; text-align: right; text-shadow: 2px 2px 2px black; pointer-events: none; }
-        .stat-item { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
-        .stat-perfect { color: #00ffff; }
-        .stat-great { color: #00ff00; }
-        .stat-good { color: #ffff00; }
-        .stat-bad { color: #ff0000; }
-        .stat-miss { color: #888888; }
+        #fever-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #ff8800, #ffff00);
+            box-shadow: 0 0 10px #ff8800;
+            transition: width 0.1s linear;
+        }
 
-        /* 판정 텍스트 */
-        .judgement-text { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scaleX(-1); font-size: 60px; font-weight: 900; text-shadow: 0 0 10px rgba(255,255,255,0.5); display: none; z-index: 20; }
-        #text-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        /* 피버 모드 */
+        .fever-active-mode #fever-bar {
+            background: linear-gradient(90deg, #00ffff, #0088ff);
+            box-shadow: 0 0 15px #00ffff;
+        }
+
+        .fever-active-text {
+            color: #00ffff !important;
+            text-shadow: 0 0 10px #00ffff;
+        }
+
+        /* 통계 텍스트 */
+        .stat-item {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .stat-perfect {
+            color: #00ffff;
+        }
+
+        .stat-great {
+            color: #00ff00;
+        }
+
+        .stat-good {
+            color: #ffff00;
+        }
+
+        .stat-bad {
+            color: #ff0000;
+        }
+
+        /* 중앙 판정 텍스트 */
+        .judgement-text {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%) scaleX(-1);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 72px;
+            font-weight: 900;
+            font-style: italic;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+            display: none;
+            z-index: 20;
+            -webkit-text-stroke: 2px rgba(0, 0, 0, 0.5);
+        }
+
+        #text-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        @keyframes pop {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.4);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
     </style>
 </head>
+
 <body>
 
     <h2 style="margin-top: 10px;">Gesture Rhythm Game</h2>
-
+    <p>환영합니다, <strong>{{ nickname }}</strong> 님!</p>
     <div class="container">
         <video id="input_video"></video>
         <canvas id="output_canvas" width="640" height="480"></canvas>
 
         <div id="text-container">
-            <!-- 좌측 정보 -->
+            <!-- 통합 UI 레이어 (좌측) -->
             <div id="ui-layer">
                 <div class="info-label">NEXT TARGET</div>
                 <div class="info-value" id="target-timer">Waiting...</div>
 
-                <!-- 추가: 제스처 표시 -->
                 <div class="info-label">REQUIRED</div>
                 <div class="info-value" id="required-gesture">-</div>
 
@@ -82,15 +270,15 @@
                 <div id="fever-container">
                     <div id="fever-bar"></div>
                 </div>
-            </div>
 
-            <!-- 우측 정보 -->
-            <div id="stats-layer">
-                <div class="stat-item stat-perfect">PERFECT: <span id="cnt-perfect">0</span></div>
-                <div class="stat-item stat-great">GREAT: <span id="cnt-great">0</span></div>
-                <div class="stat-item stat-good">GOOD: <span id="cnt-good">0</span></div>
-                <div class="stat-item stat-bad">BAD: <span id="cnt-bad">0</span></div>
-                <div class="stat-item stat-miss">MISS: <span id="cnt-miss">0</span></div>
+                <!-- 판정 통계 (Stats) 하단 배치 -->
+                <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.2);">
+                    <div class="stat-item stat-perfect">PERFECT: <span id="cnt-perfect">0</span></div>
+                    <div class="stat-item stat-great">GREAT: <span id="cnt-great">0</span></div>
+                    <div class="stat-item stat-good">GOOD: <span id="cnt-good">0</span></div>
+                    <div class="stat-item stat-bad">BAD: <span id="cnt-bad">0</span></div>
+                    <div class="stat-item stat-miss">MISS: <span id="cnt-miss">0</span></div>
+                </div>
             </div>
 
             <div id="judgement-display" class="judgement-text">PERFECT</div>
@@ -120,11 +308,15 @@
         const APPROACH_TIME = 1000;
         const MISS_THRESHOLD = -200;
 
+        // 추가: 누락된 상태 변수
+        let isHandInside = false;
+        let entryTime = 0;
+
         // --- 버튼 변수 ---
         const BTN_RADIUS = 80;
         let hoverStartTime = 0;
         let isHoveringBtn = false;
-        const BTN_HOLD_TIME = 2000;
+        const BTN_HOLD_TIME = 1000;
 
         // --- 카운트다운 변수 ---
         let countdownValue = 3;
@@ -159,16 +351,16 @@
 
         // ges.py의 _finger_up_states / classify_gesture 를 JS로 이식
         function fingerUpStates(landmarks, handednessLabel) {
-            const TH_TIP=4, TH_IP=3, TH_MCP=2;
-            const IN_TIP=8, IN_PIP=6;
-            const MI_TIP=12, MI_PIP=10;
-            const RI_TIP=16, RI_PIP=14;
-            const PI_TIP=20, PI_PIP=18;
+            const TH_TIP = 4, TH_IP = 3, TH_MCP = 2;
+            const IN_TIP = 8, IN_PIP = 6;
+            const MI_TIP = 12, MI_PIP = 10;
+            const RI_TIP = 16, RI_PIP = 14;
+            const PI_TIP = 20, PI_PIP = 18;
 
-            const indexUp  = landmarks[IN_TIP].y < landmarks[IN_PIP].y;
+            const indexUp = landmarks[IN_TIP].y < landmarks[IN_PIP].y;
             const middleUp = landmarks[MI_TIP].y < landmarks[MI_PIP].y;
-            const ringUp   = landmarks[RI_TIP].y < landmarks[RI_PIP].y;
-            const pinkyUp  = landmarks[PI_TIP].y < landmarks[PI_PIP].y;
+            const ringUp = landmarks[RI_TIP].y < landmarks[RI_PIP].y;
+            const pinkyUp = landmarks[PI_TIP].y < landmarks[PI_PIP].y;
 
             const thumbVerticalUp = landmarks[TH_TIP].y < landmarks[TH_IP].y;
 
@@ -184,21 +376,21 @@
         }
 
         function classifyGesture(states) {
-            const t=states.thumb, i=states.index, m=states.middle, r=states.ring, p=states.pinky;
-            const upCount = [t,i,m,r,p].filter(Boolean).length;
+            const t = states.thumb, i = states.index, m = states.middle, r = states.ring, p = states.pinky;
+            const upCount = [t, i, m, r, p].filter(Boolean).length;
 
             if (upCount === 0) return "FIST";
             if (upCount === 5) return "OPEN_PALM";
-            if (t && !(i||m||r||p)) return "THUMBS_UP";
-            if (i && m && !(t||r||p)) return "PEACE";
-            if (i && !(t||m||r||p)) return "POINT";
+            if (t && !(i || m || r || p)) return "THUMBS_UP";
+            if (i && m && !(t || r || p)) return "PEACE";
+            if (i && !(t || m || r || p)) return "POINT";
             return "UNKNOWN";
         }
 
         // ---------------------------------------------------------
         // WebSocket Event
         // ---------------------------------------------------------
-        socket.onmessage = function(e) {
+        socket.onmessage = function (e) {
             const data = JSON.parse(e.data);
 
             if (data.type === 'game_start') {
@@ -311,6 +503,10 @@
                 jDiv.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.5s';
                 jDiv.style.transform = 'translate(-50%, -50%) scale(1.2)';
                 jDiv.style.opacity = '1';
+
+                // 파티클 생성
+                createParticleEffect(targetX, targetY, res.judgement, res.fever_active);
+
                 setTimeout(() => {
                     jDiv.style.opacity = '0';
                     setTimeout(() => { jDiv.style.display = 'none'; }, 500);
@@ -318,6 +514,9 @@
             });
         }
 
+        // ---------------------------------------------------------
+        // MediaPipe & Rendering Loop
+        // ---------------------------------------------------------
         // ---------------------------------------------------------
         // MediaPipe & Rendering Loop
         // ---------------------------------------------------------
@@ -381,14 +580,21 @@
                 drawFinishScreen(fingerX, fingerY, handDetected);
             }
 
+            // [NEW] 파티클 이펙트 렌더링
+            updateAndDrawParticles(canvasCtx);
+
             canvasCtx.restore();
         }
 
         // --- 카운트다운 로직 ---
+        // --- 카운트다운 로직 ---
+        let startRequestSent = false;
+
         function startCountdown() {
             gameState = 'COUNTDOWN';
             countdownValue = 3;
             countdownStartTime = Date.now();
+            startRequestSent = false;
         }
 
         function processCountdown() {
@@ -402,11 +608,13 @@
             else if (elapsed < 2000) countdownValue = 2;
             else if (elapsed < 3000) countdownValue = 1;
             else {
-                socket.send(JSON.stringify({ 'action': 'game_start' }));
-
-                bgm.currentTime = 0;
-                bgm.play().catch(e => console.log("Audio Play Error:", e));
-                return;
+                if (!startRequestSent) {
+                    socket.send(JSON.stringify({ 'action': 'game_start' }));
+                    bgm.currentTime = 0;
+                    bgm.play().catch(e => console.log("Audio Play Error:", e));
+                    startRequestSent = true;
+                }
+                countdownValue = "GO!";
             }
 
             canvasCtx.save();
@@ -456,7 +664,7 @@
                     const progress = Math.min(elapsed / BTN_HOLD_TIME, 1.0);
 
                     canvasCtx.beginPath();
-                    canvasCtx.arc(bx, by, BTN_RADIUS + 5, -Math.PI/2, (-Math.PI/2) + (Math.PI * 2 * progress));
+                    canvasCtx.arc(bx, by, BTN_RADIUS + 5, -Math.PI / 2, (-Math.PI / 2) + (Math.PI * 2 * progress));
                     canvasCtx.strokeStyle = '#00ff00';
                     canvasCtx.lineWidth = 6;
                     canvasCtx.stroke();
@@ -501,23 +709,68 @@
         }
 
         // --- 게임 플레이 ---
+        // 파티클 시스템 상수
+        const COLOR_CYAN = { r: 0, g: 255, b: 255 };
+        const COLOR_GREEN = { r: 0, g: 255, b: 0 };
+        const COLOR_YELLOW = { r: 255, g: 255, b: 0 };
+        const COLOR_RED = { r: 255, g: 0, b: 0 };
+        const COLOR_WHITE = { r: 255, g: 255, b: 255 };
+        const COLOR_GOLD = { r: 255, g: 220, b: 100 };
+
+        let impactParticles = [];
+        let trailParticles = [];
+        let shockwaves = [];
+        let screenShake = 0;
+
         function processGameLogic(fx, fy, detected) {
             if (!targetActive) {
                 document.getElementById('target-timer').innerText = "Loading...";
                 return;
             }
 
+            // 거리 계산 및 상태 업데이트 (렌더링 전에 수행)
+            if (detected) {
+                const dist = Math.sqrt(Math.pow(fx - targetX, 2) + Math.pow(fy - targetY, 2));
+                isHandInside = (dist <= TARGET_RADIUS);
+            } else {
+                isHandInside = false;
+            }
+
             const currentTime = Date.now();
             const timeToHit = targetStart - currentTime;
 
+            // --- [1] 타겟 원 그리기 (Neon Line Style) ---
+            canvasCtx.save();
             canvasCtx.beginPath();
             canvasCtx.arc(targetX, targetY, TARGET_RADIUS, 0, 2 * Math.PI);
-            canvasCtx.lineWidth = 4;
-            canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-            canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+
+            if (isHandInside) {
+                // 손이 들어왔을 때: Green Glow + Thick Line
+                canvasCtx.shadowBlur = 20;
+                canvasCtx.shadowColor = '#00ff00';
+                canvasCtx.fillStyle = 'rgba(0, 255, 0, 0.2)';
+                canvasCtx.strokeStyle = '#00ff00';
+                canvasCtx.lineWidth = 5;
+            } else {
+                // 기본 상태: Cyan Neon + Sharp Line
+                canvasCtx.shadowBlur = 15;
+                canvasCtx.shadowColor = '#00ffff';
+                canvasCtx.fillStyle = 'rgba(0, 20, 40, 0.3)'; // 약간 어두운 반투명 배경
+                canvasCtx.strokeStyle = '#00ffff';
+                canvasCtx.lineWidth = 3;
+            }
+
             canvasCtx.fill();
             canvasCtx.stroke();
 
+            // 내부 디테일 라인 (선명한 흰색 실선)
+            canvasCtx.shadowBlur = 0;
+            canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            canvasCtx.lineWidth = 1;
+            canvasCtx.stroke();
+            canvasCtx.restore();
+
+            // --- [2] 어프로치 서클 그리기 (타이밍 시각화) ---
             if (timeToHit > 0 && timeToHit <= APPROACH_TIME) {
                 const progress = 1 - (timeToHit / APPROACH_TIME);
                 const startScale = 2.0;
@@ -539,6 +792,8 @@
             if (timeToHit < MISS_THRESHOLD) {
                 socket.send(JSON.stringify({ 'action': 'miss' }));
                 targetActive = false;
+                // Miss Effect
+                createParticleEffect(targetX, targetY, 'MISS');
                 return;
             }
 
@@ -556,11 +811,14 @@
                         }));
                         targetActive = false;
 
+                        // Visual Feedback (Hit Effect)
                         canvasCtx.beginPath();
                         canvasCtx.arc(targetX, targetY, TARGET_RADIUS, 0, 2 * Math.PI);
-                        canvasCtx.fillStyle = 'rgba(0, 255, 0, 0.5)';
+                        canvasCtx.fillStyle = 'rgba(0, 255, 0, 0.8)';
                         canvasCtx.fill();
                         canvasCtx.stroke();
+
+                        // Particle Effect is mainly handled by 'result' message, but we can add immediate feedback here if needed.
                     } else {
                         // 틀린 제스처면 아무것도 안 보내고, 시간 지나면 MISS 처리되게 둠
                         // 원하면 여기서 즉시 BAD 처리 메시지를 보내도록 확장 가능
@@ -569,9 +827,150 @@
             }
         }
 
-        const hands = new Hands({locateFile: (file) => {
-            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-        }});
+        // --- 파티클 클래스 및 함수 ---
+        class ImpactParticle {
+            constructor(x, y, color) {
+                this.x = x; this.y = y; this.color = color;
+                this.size = Math.random() * 3.5 + 2.0;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 15 + 8;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.gravity = 0.5; this.alpha = 255;
+                this.decay = Math.random() * 8 + 10;
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy; this.vy += this.gravity;
+                this.vx *= 0.92; this.vy *= 0.92; this.alpha -= this.decay;
+            }
+            draw(ctx) {
+                if (this.alpha <= 0) return;
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.globalAlpha = this.alpha / 255;
+                ctx.fillStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, 1)`;
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class TrailParticle {
+            constructor(x, y, color) {
+                this.x = x; this.y = y; this.color = color;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 7 + 5;
+                this.vx = Math.cos(angle) * speed; this.vy = Math.sin(angle) * speed;
+                this.history = []; this.alpha = 255; this.decay = Math.random() * 3 + 3;
+            }
+            update() {
+                this.history.push({ x: this.x, y: this.y });
+                if (this.history.length > 4) this.history.shift();
+                this.x += this.vx; this.y += this.vy;
+                this.vx *= 0.92; this.vy *= 0.92; this.alpha -= this.decay;
+            }
+            draw(ctx) {
+                if (this.alpha <= 0) return;
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                if (this.history.length > 1) {
+                    for (let i = 0; i < this.history.length - 1; i++) {
+                        const alpha = (this.alpha * (i / this.history.length) * 0.5) / 255;
+                        ctx.strokeStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${alpha})`;
+                        ctx.lineWidth = 3;
+                        ctx.beginPath(); ctx.moveTo(this.history[i].x, this.history[i].y);
+                        ctx.lineTo(this.history[i + 1].x, this.history[i + 1].y); ctx.stroke();
+                    }
+                }
+                ctx.restore();
+            }
+        }
+
+        class Shockwave {
+            constructor(x, y) {
+                this.x = x; this.y = y; this.radius = 60; this.alpha = 200; this.width = 10;
+            }
+            update() {
+                this.radius += 10; this.alpha -= 12; this.width = Math.max(0.5, this.width * 0.9);
+            }
+            draw(ctx) {
+                if (this.alpha <= 0) return;
+                ctx.save();
+                ctx.globalAlpha = this.alpha / 255;
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.strokeStyle = `rgba(255, 255, 255, ${this.alpha / 255})`;
+                ctx.lineWidth = this.width;
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        function createParticleEffect(x, y, judgement, isFever = false) {
+            let color;
+            let particleCount;
+            let speedMult = 1.0;
+
+            if (judgement === 'PERFECT') {
+                color = COLOR_CYAN; particleCount = 50; screenShake = 15; speedMult = 1.2;
+            } else if (judgement === 'GREAT') {
+                color = COLOR_GREEN; particleCount = 30; screenShake = 6; speedMult = 1.0;
+            } else if (judgement === 'GOOD') {
+                color = COLOR_YELLOW; particleCount = 15; screenShake = 2; speedMult = 0.8;
+            } else if (judgement === 'BAD') {
+                color = COLOR_RED; particleCount = 8; screenShake = 0; speedMult = 0.5;
+            } else {
+                return;
+            }
+
+            if (isFever) {
+                particleCount += 20; screenShake += 5;
+            }
+
+            for (let i = 0; i < particleCount; i++) {
+                let pColor = color;
+                if ((isFever || judgement === 'PERFECT') && Math.random() < 0.3) {
+                    pColor = (Math.random() < 0.5) ? COLOR_GOLD : COLOR_WHITE;
+                }
+                const p = new ImpactParticle(x, y, pColor);
+                p.vx *= speedMult; p.vy *= speedMult;
+                impactParticles.push(p);
+            }
+
+            if (judgement === 'PERFECT' || judgement === 'GREAT' || isFever) {
+                const trailCount = Math.floor(particleCount * 0.5);
+                for (let i = 0; i < trailCount; i++) {
+                    trailParticles.push(new TrailParticle(x, y, color));
+                }
+            }
+
+            shockwaves.push(new Shockwave(x, y));
+            if (judgement === 'PERFECT') {
+                setTimeout(() => shockwaves.push(new Shockwave(x, y)), 100);
+            }
+        }
+
+        function updateAndDrawParticles(ctx) {
+            for (let i = shockwaves.length - 1; i >= 0; i--) {
+                shockwaves[i].update();
+                if (shockwaves[i].alpha <= 0) shockwaves.splice(i, 1);
+                else shockwaves[i].draw(ctx);
+            }
+            for (let i = trailParticles.length - 1; i >= 0; i--) {
+                trailParticles[i].update();
+                if (trailParticles[i].alpha <= 0) trailParticles.splice(i, 1);
+                else trailParticles[i].draw(ctx);
+            }
+            for (let i = impactParticles.length - 1; i >= 0; i--) {
+                impactParticles[i].update();
+                if (impactParticles[i].alpha <= 0) impactParticles.splice(i, 1);
+                else impactParticles[i].draw(ctx);
+            }
+        }
+
+        const hands = new Hands({
+            locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+            }
+        });
         hands.setOptions({
             maxNumHands: 1,
             modelComplexity: 1,
@@ -581,7 +980,7 @@
         hands.onResults(onResults);
 
         const camera = new Camera(videoElement, {
-            onFrame: async () => { await hands.send({image: videoElement}); },
+            onFrame: async () => { await hands.send({ image: videoElement }); },
             width: 640,
             height: 480
         });
@@ -589,4 +988,5 @@
 
     </script>
 </body>
+
 </html>
