@@ -3,7 +3,6 @@
 <head>
     <meta charset="utf-8">
     <title>Webcam Rhythm Game</title>
-    <!-- MediaPipe 라이브러리 로드 -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
@@ -16,84 +15,37 @@
         #input_video { display: none; }
         #output_canvas { width: 100%; height: 100%; transform: scaleX(-1); /* 거울 모드 */ }
         
+        /* UI 레이어 */
         #ui-layer { position: absolute; top: 15px; left: 15px; z-index: 10; text-shadow: 2px 2px 2px black; pointer-events: none; }
         .info-label { font-size: 14px; color: #aaa; margin-bottom: 2px; margin-top: 10px; }
         .info-label:first-child { margin-top: 0; }
         .info-value { font-size: 20px; font-weight: bold; margin-bottom: 5px; transition: color 0.2s; }
         .score-value { font-size: 32px; font-weight: bold; color: #00ff00; }
         
-        /* 콤보 애니메이션 (팝핑 효과) */
-        .pop-anim {
-            animation: pop 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        @keyframes pop {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.5); color: #fff; }
-            100% { transform: scale(1); }
-        }
+        /* 콤보 애니메이션 */
+        .pop-anim { animation: pop 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.5); color: #fff; } 100% { transform: scale(1); } }
 
-        /* [NEW] 피버 게이지 스타일 */
-        #fever-container {
-            width: 150px;
-            height: 12px;
-            background: #333;
-            border: 2px solid #666;
-            border-radius: 6px;
-            overflow: hidden;
-            margin-top: 5px;
-            box-shadow: 0 0 5px rgba(0,0,0,0.5);
-        }
-        #fever-bar {
-            width: 0%;
-            height: 100%;
-            background: linear-gradient(90deg, #ffaa00, #ffff00);
-            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        /* 피버 발동 모드 (반짝임) */
-        .fever-active-mode #fever-bar {
-            background: linear-gradient(90deg, #00c6ff, #0072ff);
-            box-shadow: 0 0 15px #00c6ff;
-            animation: pulse-fever 0.5s infinite alternate;
-        }
-        .fever-active-text {
-            color: #00c6ff !important;
-            text-shadow: 0 0 10px #00c6ff !important;
-            animation: pulse-text 0.5s infinite alternate;
-        }
+        /* 피버 게이지 */
+        #fever-container { width: 150px; height: 12px; background: #333; border: 2px solid #666; border-radius: 6px; overflow: hidden; margin-top: 5px; box-shadow: 0 0 5px rgba(0,0,0,0.5); }
+        #fever-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #ffaa00, #ffff00); transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .fever-active-mode #fever-bar { background: linear-gradient(90deg, #00c6ff, #0072ff); box-shadow: 0 0 15px #00c6ff; animation: pulse-fever 0.5s infinite alternate; }
+        .fever-active-text { color: #00c6ff !important; text-shadow: 0 0 10px #00c6ff !important; animation: pulse-text 0.5s infinite alternate; }
+        @keyframes pulse-fever { from { opacity: 0.8; } to { opacity: 1.0; box-shadow: 0 0 20px #00c6ff; } }
+        @keyframes pulse-text { from { transform: scale(1); } to { transform: scale(1.1); } }
 
-        @keyframes pulse-fever {
-            from { opacity: 0.8; }
-            to { opacity: 1.0; box-shadow: 0 0 20px #00c6ff; }
-        }
-        @keyframes pulse-text {
-            from { transform: scale(1); }
-            to { transform: scale(1.1); }
-        }
-
-        /* 통계 표시용 스타일 (우측 상단) */
+        /* 통계 스타일 */
         #stats-layer { position: absolute; top: 15px; right: 15px; z-index: 10; text-align: right; text-shadow: 2px 2px 2px black; pointer-events: none; }
         .stat-item { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
         .stat-perfect { color: #00ffff; }
         .stat-great { color: #00ff00; }
         .stat-good { color: #ffff00; }
         .stat-bad { color: #ff0000; }
+        .stat-miss { color: #888888; }
 
-        /* 중앙 판정 텍스트 (Perfect, Great 등) */
-        .judgement-text { 
-            position: absolute; top: 40%; left: 50%; 
-            transform: translate(-50%, -50%) scaleX(-1); /* 텍스트 거울모드 방지용 역반전 */
-            font-size: 60px; font-weight: 900; 
-            text-shadow: 0 0 10px rgba(255,255,255,0.5);
-            display: none; 
-            z-index: 20;
-        }
-        
-        /* 텍스트가 거울모드(scaleX(-1)) 된 캔버스 위에 있어서 뒤집히는 것을 방지하기 위한 컨테이너 */
-        #text-container {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
-        }
+        /* 판정 텍스트 */
+        .judgement-text { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scaleX(-1); font-size: 60px; font-weight: 900; text-shadow: 0 0 10px rgba(255,255,255,0.5); display: none; z-index: 20; }
+        #text-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
     </style>
 </head>
 <body>
@@ -105,7 +57,7 @@
         <canvas id="output_canvas" width="640" height="480"></canvas>
         
         <div id="text-container">
-            <!-- 좌측 정보 (타이머, 콤보, 점수, 랭크, 피버) -->
+            <!-- 좌측 정보 -->
             <div id="ui-layer">
                 <div class="info-label">NEXT TARGET</div>
                 <div class="info-value" id="target-timer">Waiting...</div>
@@ -119,101 +71,119 @@
                 <div class="info-label">RANK</div>
                 <div class="info-value" id="rank">-</div>
 
-                <!-- [NEW] 피버 게이지 -->
                 <div class="info-label" id="fever-label">FEVER</div>
                 <div id="fever-container">
                     <div id="fever-bar"></div>
                 </div>
             </div>
 
-            <!-- 우측 정보 (판정 통계) -->
+            <!-- 우측 정보 -->
             <div id="stats-layer">
                 <div class="stat-item stat-perfect">PERFECT: <span id="cnt-perfect">0</span></div>
                 <div class="stat-item stat-great">GREAT: <span id="cnt-great">0</span></div>
                 <div class="stat-item stat-good">GOOD: <span id="cnt-good">0</span></div>
                 <div class="stat-item stat-bad">BAD: <span id="cnt-bad">0</span></div>
+                <div class="stat-item stat-miss">MISS: <span id="cnt-miss">0</span></div>
             </div>
             
-            <!-- 중앙 판정 이펙트 -->
             <div id="judgement-display" class="judgement-text">PERFECT</div>
         </div>
     </div>
 
+    <!-- 배경 음악 (m4a 파일 적용) -->
+    <!-- static 폴더에 music.m4a 파일이 있어야 합니다 -->
+    <audio id="bgm" src="/static/최강록 - 앙 (䬬) (feat. 아기맹수, 임짱).m4a" preload="auto"></audio>
+
     <script>
-        // ---------------------------------------------------------
-        // 1. 초기 설정
-        // ---------------------------------------------------------
         const videoElement = document.getElementById('input_video');
         const canvasElement = document.getElementById('output_canvas');
         const canvasCtx = canvasElement.getContext('2d');
-        
-        // WebSocket 연결
         const socket = new WebSocket('ws://' + window.location.host + '/ws/stream/');
+        const bgm = document.getElementById('bgm');
 
-        // 게임 상태 변수
+        // --- 게임 상태 ---
+        let gameState = 'MENU'; // 'MENU', 'COUNTDOWN', 'PLAYING', 'FINISHED'
+        let finalResultData = null; 
+        
+        // --- 게임 플레이 변수 ---
         let targetStart = 0;
-        let targetEnd = 0;
-        
-        let isHandInside = false;
-        let entryTime = 0;
-        let exitTime = 0;
-        let minDistanceInGesture = 9999;
-        
-        // 타겟 위치 및 크기 (랜덤 변경됨)
+        let targetActive = false;
         let targetX = 320; 
         let targetY = 240; 
         const TARGET_RADIUS = 60; 
-        const APPROACH_TIME = 2000; // 어프로치 서클이 보이는 시간 (ms)
+        
+        const APPROACH_TIME = 1000; 
+        const MISS_THRESHOLD = -200; 
 
-        // 판정 통계 저장용
-        let stats = {
-            PERFECT: 0,
-            GREAT: 0,
-            GOOD: 0,
-            BAD: 0
-        };
+        // --- 버튼 변수 ---
+        const BTN_RADIUS = 80;
+        let hoverStartTime = 0;
+        let isHoveringBtn = false;
+        const BTN_HOLD_TIME = 2000; 
+
+        // --- 카운트다운 변수 ---
+        let countdownValue = 3;
+        let countdownStartTime = 0;
+
+        let stats = { PERFECT: 0, GREAT: 0, GOOD: 0, BAD: 0, MISS: 0 };
 
         // ---------------------------------------------------------
-        // 2. WebSocket 이벤트 핸들링
+        // WebSocket Event
         // ---------------------------------------------------------
         socket.onmessage = function(e) {
             const data = JSON.parse(e.data);
 
-            // 다음 목표 수신
-            if (data.type === 'system' || data.type === 'next_target') {
+            if (data.type === 'game_start') {
+                // 서버에서 게임 시작을 알리면 실제로 PLAYING 상태로 전환
+                gameState = 'PLAYING';
+                stats = { PERFECT: 0, GREAT: 0, GOOD: 0, BAD: 0, MISS: 0 };
+                updateStatsUI();
+                console.log("Game Started! Music Playing...");
+            }
+
+            if (data.type === 'next_target') {
                 targetStart = data.target_start;
-                targetEnd = data.target_end;
-                setRandomPosition(); // 위치 랜덤 변경
+                targetActive = true;
+                setRandomPosition();
             }
             
-            // 결과 수신
             if (data.type === 'result') {
                 showResult(data.data);
             }
+
+            if (data.type === 'game_over') {
+                gameState = 'FINISHED';
+                finalResultData = data; 
+                document.getElementById('judgement-display').style.display = 'none';
+                
+                // 음악 정지 및 되감기
+                bgm.pause();
+                bgm.currentTime = 0;
+            }
         };
 
-        // 타겟 위치 랜덤 설정 함수
+        function updateStatsUI() {
+            for (let key in stats) {
+                document.getElementById(`cnt-${key.toLowerCase()}`).innerText = stats[key];
+            }
+        }
+
         function setRandomPosition() {
-            const padding = TARGET_RADIUS + 30; // 화면 밖으로 나가지 않게 여백
+            const padding = TARGET_RADIUS + 30; 
             const maxX = 640 - padding;
             const maxY = 480 - padding;
             const minX = padding;
             const minY = padding;
-
             targetX = Math.random() * (maxX - minX) + minX;
             targetY = Math.random() * (maxY - minY) + minY;
         }
 
-        // 결과 표시 및 애니메이션 함수
         function showResult(res) {
-            // 점수 및 랭크 갱신
             document.getElementById('score').innerText = res.total_score;
             document.getElementById('rank').innerText = res.rank;
             
-            // 콤보 업데이트 & 팝업 애니메이션
             const comboEl = document.getElementById('combo');
             comboEl.innerText = res.combo;
-            
             comboEl.classList.remove('pop-anim');
             void comboEl.offsetWidth; 
             
@@ -224,43 +194,32 @@
                 comboEl.style.color = '#aaa'; 
             }
 
-            // [NEW] 피버 게이지 업데이트
+            // Fever Gauge
             const feverBar = document.getElementById('fever-bar');
             const feverContainer = document.getElementById('fever-container');
             const feverLabel = document.getElementById('fever-label');
-
             let widthPct = 0;
 
             if (res.fever_active) {
-                // 피버 발동 중일 때: 남은 시간에 비례해서 게이지가 줄어듦
-                // (fever_active_notes / fever_duration) * 100
                 widthPct = (res.fever_active_notes / res.fever_duration) * 100;
-                
-                // 스타일 적용 (파란색 네온)
                 feverContainer.classList.add('fever-active-mode');
                 feverLabel.classList.add('fever-active-text');
                 feverLabel.innerText = "FEVER TIME!";
             } else {
-                // 일반 모드: 게이지 충전량
-                // (fever_gauge / fever_max) * 100
                 widthPct = (res.fever_gauge / res.fever_max) * 100;
-                
-                // 스타일 해제 (노란색/주황색)
                 feverContainer.classList.remove('fever-active-mode');
                 feverLabel.classList.remove('fever-active-text');
                 feverLabel.innerText = "FEVER";
             }
-            
             feverBar.style.width = widthPct + "%";
 
-
-            // 통계 카운트 증가
+            // Stats
             if (stats.hasOwnProperty(res.judgement)) {
                 stats[res.judgement]++;
                 document.getElementById(`cnt-${res.judgement.toLowerCase()}`).innerText = stats[res.judgement];
             }
 
-            // 중앙 판정 텍스트 표시
+            // Text
             const jDiv = document.getElementById('judgement-display');
             jDiv.innerText = res.judgement;
             
@@ -269,12 +228,12 @@
             else if (res.judgement === 'GREAT') color = '#00ff00'; 
             else if (res.judgement === 'GOOD') color = '#ffff00'; 
             else if (res.judgement === 'BAD') color = '#ff0000'; 
+            else if (res.judgement === 'MISS') color = '#888888';
             
             jDiv.style.color = color;
             jDiv.style.textShadow = `0 0 20px ${color}`;
             jDiv.style.display = 'block';
             
-            // 텍스트 등장 애니메이션
             jDiv.style.transition = 'none';
             jDiv.style.transform = 'translate(-50%, -50%) scale(0.5)';
             
@@ -282,7 +241,6 @@
                 jDiv.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.5s';
                 jDiv.style.transform = 'translate(-50%, -50%) scale(1.2)';
                 jDiv.style.opacity = '1';
-                
                 setTimeout(() => {
                     jDiv.style.opacity = '0';
                     setTimeout(() => { jDiv.style.display = 'none'; }, 500);
@@ -291,122 +249,251 @@
         }
 
         // ---------------------------------------------------------
-        // 3. MediaPipe & Rendering 루프
+        // MediaPipe & Rendering Loop
         // ---------------------------------------------------------
         function onResults(results) {
-            // 캔버스 초기화 및 비디오 그리기
             canvasCtx.save();
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
             canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-            const currentTime = Date.now();
-            const timeToHit = targetStart - currentTime;
+            let fingerX = -1, fingerY = -1;
+            let handDetected = false;
 
-            // --- [1] 타겟 원 그리기 ---
-            canvasCtx.beginPath();
-            canvasCtx.arc(targetX, targetY, TARGET_RADIUS, 0, 2 * Math.PI);
-            canvasCtx.lineWidth = 4;
-            
-            if (isHandInside) {
-                canvasCtx.fillStyle = 'rgba(0, 255, 0, 0.3)';
-                canvasCtx.fill();
-                canvasCtx.strokeStyle = '#00ff00';
-            } else {
-                canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-                canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.2)'; 
-                canvasCtx.fill();
-            }
-            canvasCtx.stroke();
-
-            // --- [2] 어프로치 서클 그리기 (타이밍 시각화) ---
-            if (timeToHit > 0 && timeToHit <= APPROACH_TIME) {
-                const progress = 1 - (timeToHit / APPROACH_TIME);
-                const startScale = 2.5; // 시작 크기 배율
-                const currentRadius = TARGET_RADIUS * (1 + (startScale - 1) * (1 - progress));
-                
-                canvasCtx.beginPath();
-                canvasCtx.arc(targetX, targetY, currentRadius, 0, 2 * Math.PI);
-                canvasCtx.lineWidth = 3;
-                canvasCtx.strokeStyle = `rgba(0, 255, 255, ${0.5 + progress * 0.5})`; // 투명도 조절
-                canvasCtx.stroke();
-            }
-
-            // --- [3] 타이머 텍스트 갱신 ---
-            if (timeToHit > 0) {
-                document.getElementById('target-timer').innerText = (timeToHit / 1000).toFixed(2) + "s";
-            } else if (timeToHit > -1000) {
-                 document.getElementById('target-timer').innerText = "NOW!";
-            } else {
-                document.getElementById('target-timer').innerText = "Waiting...";
-            }
-
-            // --- [4] 손 인식 및 충돌 처리 ---
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const landmarks = results.multiHandLandmarks[0];
-                const indexFinger = landmarks[8]; // 검지 손가락 끝
-                
-                // 좌표 변환 (0~1 -> 픽셀)
-                const fingerX = indexFinger.x * canvasElement.width;
-                const fingerY = indexFinger.y * canvasElement.height;
+                const indexFinger = landmarks[8];
+                fingerX = indexFinger.x * canvasElement.width;
+                fingerY = indexFinger.y * canvasElement.height;
+                handDetected = true;
 
-                // 거리 계산
-                const distance = Math.sqrt(Math.pow(fingerX - targetX, 2) + Math.pow(fingerY - targetY, 2));
-
-                // 손 위치 커서
+                // 커서
                 canvasCtx.beginPath();
-                canvasCtx.arc(fingerX, fingerY, 8, 0, 2 * Math.PI);
+                canvasCtx.arc(fingerX, fingerY, 10, 0, 2 * Math.PI);
                 canvasCtx.fillStyle = '#ff0055'; 
                 canvasCtx.fill();
                 canvasCtx.strokeStyle = 'white';
                 canvasCtx.lineWidth = 2;
                 canvasCtx.stroke();
-
-                const currentlyInside = distance <= TARGET_RADIUS;
-
-                if (currentlyInside) {
-                    minDistanceInGesture = Math.min(minDistanceInGesture, distance);
-                    if (!isHandInside) {
-                        isHandInside = true;
-                        entryTime = Date.now();
-                        // 진입 시 효과음이나 시각 효과를 여기에 추가 가능
-                    }
-                } else {
-                    if (isHandInside) {
-                        // 손이 나가는 순간 -> 데이터 전송
-                        isHandInside = false;
-                        exitTime = Date.now();
-                        
-                        socket.send(JSON.stringify({
-                            'action': 'gesture_complete',
-                            'entry_time': entryTime,
-                            'exit_time': exitTime,
-                            'min_dist': minDistanceInGesture
-                        }));
-                        minDistanceInGesture = 9999;
-                    }
-                }
             }
+
+            // === [상태 1] 메뉴 ===
+            if (gameState === 'MENU') {
+                drawInteractiveButton("START", 320, 240, fingerX, fingerY, handDetected);
+            }
+            // === [상태 1.5] 카운트다운 (여기서 3, 2, 1 표시) ===
+            else if (gameState === 'COUNTDOWN') {
+                processCountdown();
+            }
+            // === [상태 2] 게임 중 ===
+            else if (gameState === 'PLAYING') {
+                processGameLogic(fingerX, fingerY, handDetected);
+            }
+            // === [상태 3] 결과 ===
+            else if (gameState === 'FINISHED') {
+                drawFinishScreen(fingerX, fingerY, handDetected);
+            }
+
             canvasCtx.restore();
         }
 
-        // MediaPipe 초기화
+        // --- 카운트다운 로직 ---
+        function startCountdown() {
+            gameState = 'COUNTDOWN';
+            countdownValue = 3;
+            countdownStartTime = Date.now();
+        }
+
+        function processCountdown() {
+            // 배경 약간 어둡게 (집중 효과)
+            canvasCtx.fillStyle = "rgba(0, 0, 0, 0.5)";
+            canvasCtx.fillRect(0, 0, 640, 480);
+
+            const now = Date.now();
+            const elapsed = now - countdownStartTime;
+            
+            // 3초 카운트다운
+            if (elapsed < 1000) countdownValue = 3;
+            else if (elapsed < 2000) countdownValue = 2;
+            else if (elapsed < 3000) countdownValue = 1;
+            else {
+                // 카운트다운 종료 -> 서버에 게임 시작 알림 & 음악 재생
+                socket.send(JSON.stringify({ 'action': 'game_start' }));
+                
+                // 음악 재생 (브라우저 정책상 사용자 인터랙션 후 재생은 허용됨)
+                bgm.currentTime = 0;
+                bgm.play().catch(e => console.log("Audio Play Error:", e));
+                
+                // 클라이언트 상태는 잠시 대기 (서버 응답 오면 PLAYING으로 바뀜)
+                return;
+            }
+
+            // 숫자 그리기 (거울 모드 보정)
+            canvasCtx.save();
+            canvasCtx.translate(320, 240);
+            canvasCtx.scale(-1, 1);
+            
+            canvasCtx.fillStyle = "white";
+            canvasCtx.font = "bold 150px Arial";
+            canvasCtx.textAlign = "center";
+            canvasCtx.textBaseline = "middle";
+            canvasCtx.shadowColor = "#00c6ff";
+            canvasCtx.shadowBlur = 20;
+            canvasCtx.fillText(countdownValue, 0, 0);
+            
+            canvasCtx.restore();
+        }
+
+        // --- 버튼 (Start / Replay) ---
+        function drawInteractiveButton(text, bx, by, fx, fy, detected) {
+            canvasCtx.beginPath();
+            canvasCtx.arc(bx, by, BTN_RADIUS, 0, 2 * Math.PI);
+            canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            canvasCtx.fill();
+            canvasCtx.strokeStyle = 'white';
+            canvasCtx.lineWidth = 3;
+            canvasCtx.stroke();
+
+            canvasCtx.save();
+            canvasCtx.translate(bx, by);
+            canvasCtx.scale(-1, 1); 
+            canvasCtx.fillStyle = 'white';
+            canvasCtx.font = 'bold 30px Arial';
+            canvasCtx.textAlign = 'center';
+            canvasCtx.textBaseline = 'middle';
+            canvasCtx.fillText(text, 0, 0);
+            canvasCtx.restore();
+
+            if (detected) {
+                const dist = Math.sqrt(Math.pow(fx - bx, 2) + Math.pow(fy - by, 2));
+                if (dist <= BTN_RADIUS) {
+                    if (!isHoveringBtn) {
+                        isHoveringBtn = true;
+                        hoverStartTime = Date.now();
+                    }
+                    
+                    const elapsed = Date.now() - hoverStartTime;
+                    const progress = Math.min(elapsed / BTN_HOLD_TIME, 1.0);
+
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(bx, by, BTN_RADIUS + 5, -Math.PI/2, (-Math.PI/2) + (Math.PI * 2 * progress));
+                    canvasCtx.strokeStyle = '#00ff00';
+                    canvasCtx.lineWidth = 6;
+                    canvasCtx.stroke();
+
+                    if (progress >= 1.0) {
+                        // [중요] 바로 시작하지 않고 카운트다운 함수 호출
+                        startCountdown();
+                        isHoveringBtn = false; 
+                    }
+                } else {
+                    isHoveringBtn = false;
+                }
+            } else {
+                isHoveringBtn = false;
+            }
+        }
+
+        // --- 결과 화면 ---
+        function drawFinishScreen(fx, fy, detected) {
+            canvasCtx.fillStyle = "rgba(0, 0, 0, 0.7)";
+            canvasCtx.fillRect(0, 0, 640, 480);
+
+            canvasCtx.save();
+            canvasCtx.translate(320, 120); 
+            canvasCtx.scale(-1, 1);
+            
+            canvasCtx.fillStyle = "white";
+            canvasCtx.font = "bold 40px Arial";
+            canvasCtx.textAlign = "center";
+            canvasCtx.fillText("GAME CLEAR!", 0, 0);
+            
+            if (finalResultData) {
+                canvasCtx.font = "bold 30px Arial";
+                canvasCtx.fillStyle = "#ffff00";
+                canvasCtx.fillText(`RANK: ${finalResultData.rank}`, 0, 50);
+                
+                canvasCtx.fillStyle = "#00ff00";
+                canvasCtx.fillText(`SCORE: ${finalResultData.total_score}`, 0, 90);
+            }
+            canvasCtx.restore();
+
+            drawInteractiveButton("REPLAY", 320, 360, fx, fy, detected);
+        }
+
+        // --- 게임 플레이 ---
+        function processGameLogic(fx, fy, detected) {
+            if (!targetActive) {
+                document.getElementById('target-timer').innerText = "Loading...";
+                return;
+            }
+
+            const currentTime = Date.now();
+            const timeToHit = targetStart - currentTime;
+
+            canvasCtx.beginPath();
+            canvasCtx.arc(targetX, targetY, TARGET_RADIUS, 0, 2 * Math.PI);
+            canvasCtx.lineWidth = 4;
+            canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.2)'; 
+            canvasCtx.fill();
+            canvasCtx.stroke();
+
+            if (timeToHit > 0 && timeToHit <= APPROACH_TIME) {
+                const progress = 1 - (timeToHit / APPROACH_TIME);
+                const startScale = 2.0; 
+                const currentRadius = TARGET_RADIUS * (1 + (startScale - 1) * (1 - progress));
+                
+                canvasCtx.beginPath();
+                canvasCtx.arc(targetX, targetY, currentRadius, 0, 2 * Math.PI);
+                canvasCtx.lineWidth = 3;
+                canvasCtx.strokeStyle = `rgba(0, 255, 255, ${0.5 + progress * 0.5})`; 
+                canvasCtx.stroke();
+            }
+
+            if (timeToHit > 0) {
+                document.getElementById('target-timer').innerText = (timeToHit / 1000).toFixed(2) + "s";
+            } else if (timeToHit > -1000) {
+                 document.getElementById('target-timer').innerText = "HIT NOW!";
+            }
+
+            if (timeToHit < MISS_THRESHOLD) {
+                socket.send(JSON.stringify({ 'action': 'miss' }));
+                targetActive = false; 
+                return;
+            }
+
+            if (detected) {
+                const distance = Math.sqrt(Math.pow(fx - targetX, 2) + Math.pow(fy - targetY, 2));
+                if (distance <= TARGET_RADIUS) {
+                    socket.send(JSON.stringify({
+                        'action': 'gesture_complete',
+                        'entry_time': Date.now(),
+                        'min_dist': distance
+                    }));
+                    targetActive = false; 
+                    
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(targetX, targetY, TARGET_RADIUS, 0, 2 * Math.PI);
+                    canvasCtx.fillStyle = 'rgba(0, 255, 0, 0.5)';
+                    canvasCtx.fill();
+                    canvasCtx.stroke();
+                }
+            }
+        }
+
         const hands = new Hands({locateFile: (file) => {
             return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
         }});
-
         hands.setOptions({
             maxNumHands: 1,
             modelComplexity: 1,
             minDetectionConfidence: 0.5,
             minTrackingConfidence: 0.5
         });
-
         hands.onResults(onResults);
 
         const camera = new Camera(videoElement, {
-            onFrame: async () => {
-                await hands.send({image: videoElement});
-            },
+            onFrame: async () => { await hands.send({image: videoElement}); },
             width: 640,
             height: 480
         });
