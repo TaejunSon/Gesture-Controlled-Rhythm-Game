@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Nickname</title>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f4f4f4;
+      font-family: system-ui, sans-serif;
+    }
+
+    .box {
+      background: white;
+      padding: 40px 50px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+      text-align: center;
+    }
+
+    input {
+      font-size: 18px;
+      padding: 12px 14px;
+      width: 240px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      margin-top: 10px;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 12px 28px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      background: #222;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="box">
+    <h2>닉네임 입력</h2>
+
+    <form method="post">
+      {% csrf_token %}
+      <input
+        type="text"
+        name="nickname"
+        placeholder="닉네임을 입력하세요"
+        required
+      />
+      <br />
+      <button type="submit">확인</button>
+    </form>
+  </div>
+
+</body>
+</html>

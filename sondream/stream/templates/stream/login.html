@@ -1,0 +1,52 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Login</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    body {
+      background-image: url("{% static 'stream/images/loginpage.png' %}");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: system-ui, sans-serif;
+    }
+
+    .login-btn {
+      padding: 18px 48px;
+      font-size: 20px;
+      border-radius: 40px;
+      border: none;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.6);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .login-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+    }
+  </style>
+</head>
+<body>
+
+  <form action="{% url 'nickname' %}">
+    <button type="submit" class="login-btn">
+      로그인
+    </button>
+  </form>
+
+</body>
+</html>

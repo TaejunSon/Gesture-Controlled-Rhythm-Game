@@ -21,7 +21,8 @@ from stream import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', mainpage),
     path('stream/', views.game_page),
-
+    path("", views.login_page, name="login"),
+    path("nickname/", views.nickname_page, name="nickname"),
 ]
+
