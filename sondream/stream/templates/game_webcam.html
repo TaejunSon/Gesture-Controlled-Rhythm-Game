@@ -11,17 +11,17 @@
     <style>
         body { margin: 0; padding: 0; background-color: #222; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; }
         .container { position: relative; width: 640px; height: 480px; margin-top: 20px; border: 3px solid #444; border-radius: 10px; overflow: hidden; background: #000; }
-        
+
         #input_video { display: none; }
         #output_canvas { width: 100%; height: 100%; transform: scaleX(-1); /* 거울 모드 */ }
-        
+
         /* UI 레이어 */
         #ui-layer { position: absolute; top: 15px; left: 15px; z-index: 10; text-shadow: 2px 2px 2px black; pointer-events: none; }
         .info-label { font-size: 14px; color: #aaa; margin-bottom: 2px; margin-top: 10px; }
         .info-label:first-child { margin-top: 0; }
         .info-value { font-size: 20px; font-weight: bold; margin-bottom: 5px; transition: color 0.2s; }
         .score-value { font-size: 32px; font-weight: bold; color: #00ff00; }
-        
+
         /* 콤보 애니메이션 */
         .pop-anim { animation: pop 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.5); color: #fff; } 100% { transform: scale(1); } }
@@ -51,20 +51,27 @@
 <body>
 
     <h2 style="margin-top: 10px;">Gesture Rhythm Game</h2>
-    
+
     <div class="container">
         <video id="input_video"></video>
         <canvas id="output_canvas" width="640" height="480"></canvas>
-        
+
         <div id="text-container">
             <!-- 좌측 정보 -->
             <div id="ui-layer">
                 <div class="info-label">NEXT TARGET</div>
                 <div class="info-value" id="target-timer">Waiting...</div>
-                
+
+                <!-- 추가: 제스처 표시 -->
+                <div class="info-label">REQUIRED</div>
+                <div class="info-value" id="required-gesture">-</div>
+
+                <div class="info-label">CURRENT</div>
+                <div class="info-value" id="current-gesture">-</div>
+
                 <div class="info-label">COMBO</div>
                 <div class="info-value" id="combo" style="color: yellow;">0</div>
-                
+
                 <div class="info-label">SCORE</div>
                 <div class="score-value" id="score">0</div>
 
@@ -85,13 +92,11 @@
                 <div class="stat-item stat-bad">BAD: <span id="cnt-bad">0</span></div>
                 <div class="stat-item stat-miss">MISS: <span id="cnt-miss">0</span></div>
             </div>
-            
+
             <div id="judgement-display" class="judgement-text">PERFECT</div>
         </div>
     </div>
 
-    <!-- 배경 음악 (m4a 파일 적용) -->
-    <!-- static 폴더에 music.m4a 파일이 있어야 합니다 -->
     <audio id="bgm" src="/static/최강록 - 앙 (䬬) (feat. 아기맹수, 임짱).m4a" preload="auto"></audio>
 
     <script>
@@ -103,29 +108,92 @@
 
         // --- 게임 상태 ---
         let gameState = 'MENU'; // 'MENU', 'COUNTDOWN', 'PLAYING', 'FINISHED'
-        let finalResultData = null; 
-        
+        let finalResultData = null;
+
         // --- 게임 플레이 변수 ---
         let targetStart = 0;
         let targetActive = false;
-        let targetX = 320; 
-        let targetY = 240; 
-        const TARGET_RADIUS = 60; 
-        
-        const APPROACH_TIME = 1000; 
-        const MISS_THRESHOLD = -200; 
+        let targetX = 320;
+        let targetY = 240;
+        const TARGET_RADIUS = 60;
+
+        const APPROACH_TIME = 1000;
+        const MISS_THRESHOLD = -200;
 
         // --- 버튼 변수 ---
         const BTN_RADIUS = 80;
         let hoverStartTime = 0;
         let isHoveringBtn = false;
-        const BTN_HOLD_TIME = 2000; 
+        const BTN_HOLD_TIME = 2000;
 
         // --- 카운트다운 변수 ---
         let countdownValue = 3;
         let countdownStartTime = 0;
 
         let stats = { PERFECT: 0, GREAT: 0, GOOD: 0, BAD: 0, MISS: 0 };
+
+        // --- 제스처 관련(추가) ---
+        const GESTURES = ["OPEN_PALM", "FIST", "THUMBS_UP", "PEACE", "POINT"];
+        let requiredGesture = null;
+        let currentGesture = "NO_HAND";
+
+        // 간단 안정화: 최근 N프레임 최빈값
+        const gestureQueue = [];
+        const GESTURE_QUEUE_MAX = 10;
+
+        function pushGesture(label) {
+            gestureQueue.push(label);
+            if (gestureQueue.length > GESTURE_QUEUE_MAX) gestureQueue.shift();
+        }
+
+        function stableGesture() {
+            if (gestureQueue.length === 0) return "UNKNOWN";
+            const freq = {};
+            for (const g of gestureQueue) freq[g] = (freq[g] || 0) + 1;
+            let best = null, bestCnt = -1;
+            for (const k in freq) {
+                if (freq[k] > bestCnt) { bestCnt = freq[k]; best = k; }
+            }
+            return best;
+        }
+
+        // ges.py의 _finger_up_states / classify_gesture 를 JS로 이식
+        function fingerUpStates(landmarks, handednessLabel) {
+            const TH_TIP=4, TH_IP=3, TH_MCP=2;
+            const IN_TIP=8, IN_PIP=6;
+            const MI_TIP=12, MI_PIP=10;
+            const RI_TIP=16, RI_PIP=14;
+            const PI_TIP=20, PI_PIP=18;
+
+            const indexUp  = landmarks[IN_TIP].y < landmarks[IN_PIP].y;
+            const middleUp = landmarks[MI_TIP].y < landmarks[MI_PIP].y;
+            const ringUp   = landmarks[RI_TIP].y < landmarks[RI_PIP].y;
+            const pinkyUp  = landmarks[PI_TIP].y < landmarks[PI_PIP].y;
+
+            const thumbVerticalUp = landmarks[TH_TIP].y < landmarks[TH_IP].y;
+
+            let thumbOpen = false;
+            if (handednessLabel === "Right") {
+                thumbOpen = landmarks[TH_TIP].x < landmarks[TH_MCP].x;
+            } else {
+                thumbOpen = landmarks[TH_TIP].x > landmarks[TH_MCP].x;
+            }
+            const thumbUp = thumbVerticalUp || thumbOpen;
+
+            return { thumb: thumbUp, index: indexUp, middle: middleUp, ring: ringUp, pinky: pinkyUp };
+        }
+
+        function classifyGesture(states) {
+            const t=states.thumb, i=states.index, m=states.middle, r=states.ring, p=states.pinky;
+            const upCount = [t,i,m,r,p].filter(Boolean).length;
+
+            if (upCount === 0) return "FIST";
+            if (upCount === 5) return "OPEN_PALM";
+            if (t && !(i||m||r||p)) return "THUMBS_UP";
+            if (i && m && !(t||r||p)) return "PEACE";
+            if (i && !(t||m||r||p)) return "POINT";
+            return "UNKNOWN";
+        }
 
         // ---------------------------------------------------------
         // WebSocket Event
@@ -134,7 +202,6 @@
             const data = JSON.parse(e.data);
 
             if (data.type === 'game_start') {
-                // 서버에서 게임 시작을 알리면 실제로 PLAYING 상태로 전환
                 gameState = 'PLAYING';
                 stats = { PERFECT: 0, GREAT: 0, GOOD: 0, BAD: 0, MISS: 0 };
                 updateStatsUI();
@@ -145,18 +212,21 @@
                 targetStart = data.target_start;
                 targetActive = true;
                 setRandomPosition();
+
+                // 추가: 서버가 요구하는 제스처 수신
+                requiredGesture = data.required_gesture || null;
+                document.getElementById('required-gesture').innerText = requiredGesture || "-";
             }
-            
+
             if (data.type === 'result') {
                 showResult(data.data);
             }
 
             if (data.type === 'game_over') {
                 gameState = 'FINISHED';
-                finalResultData = data; 
+                finalResultData = data;
                 document.getElementById('judgement-display').style.display = 'none';
-                
-                // 음악 정지 및 되감기
+
                 bgm.pause();
                 bgm.currentTime = 0;
             }
@@ -169,7 +239,7 @@
         }
 
         function setRandomPosition() {
-            const padding = TARGET_RADIUS + 30; 
+            const padding = TARGET_RADIUS + 30;
             const maxX = 640 - padding;
             const maxY = 480 - padding;
             const minX = padding;
@@ -181,17 +251,17 @@
         function showResult(res) {
             document.getElementById('score').innerText = res.total_score;
             document.getElementById('rank').innerText = res.rank;
-            
+
             const comboEl = document.getElementById('combo');
             comboEl.innerText = res.combo;
             comboEl.classList.remove('pop-anim');
-            void comboEl.offsetWidth; 
-            
+            void comboEl.offsetWidth;
+
             if (res.combo > 0) {
-                comboEl.style.color = 'yellow'; 
+                comboEl.style.color = 'yellow';
                 comboEl.classList.add('pop-anim');
             } else {
-                comboEl.style.color = '#aaa'; 
+                comboEl.style.color = '#aaa';
             }
 
             // Fever Gauge
@@ -222,21 +292,21 @@
             // Text
             const jDiv = document.getElementById('judgement-display');
             jDiv.innerText = res.judgement;
-            
+
             let color = '#fff';
-            if (res.judgement === 'PERFECT') color = '#00ffff'; 
-            else if (res.judgement === 'GREAT') color = '#00ff00'; 
-            else if (res.judgement === 'GOOD') color = '#ffff00'; 
-            else if (res.judgement === 'BAD') color = '#ff0000'; 
+            if (res.judgement === 'PERFECT') color = '#00ffff';
+            else if (res.judgement === 'GREAT') color = '#00ff00';
+            else if (res.judgement === 'GOOD') color = '#ffff00';
+            else if (res.judgement === 'BAD') color = '#ff0000';
             else if (res.judgement === 'MISS') color = '#888888';
-            
+
             jDiv.style.color = color;
             jDiv.style.textShadow = `0 0 20px ${color}`;
             jDiv.style.display = 'block';
-            
+
             jDiv.style.transition = 'none';
             jDiv.style.transform = 'translate(-50%, -50%) scale(0.5)';
-            
+
             requestAnimationFrame(() => {
                 jDiv.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.5s';
                 jDiv.style.transform = 'translate(-50%, -50%) scale(1.2)';
@@ -259,37 +329,55 @@
             let fingerX = -1, fingerY = -1;
             let handDetected = false;
 
+            // 제스처 인식 기본값
+            let handednessLabel = "Right";
+            let rawGesture = "NO_HAND";
+
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const landmarks = results.multiHandLandmarks[0];
+
+                // handedness (가능하면 사용)
+                if (results.multiHandedness && results.multiHandedness.length > 0) {
+                    handednessLabel = results.multiHandedness[0].label || "Right";
+                }
+
+                // 커서용 검지 tip
                 const indexFinger = landmarks[8];
                 fingerX = indexFinger.x * canvasElement.width;
                 fingerY = indexFinger.y * canvasElement.height;
                 handDetected = true;
 
+                // 제스처 분류
+                const states = fingerUpStates(landmarks, handednessLabel);
+                rawGesture = classifyGesture(states);
+
+                pushGesture(rawGesture);
+                currentGesture = stableGesture();
+
+                document.getElementById('current-gesture').innerText = currentGesture;
+
                 // 커서
                 canvasCtx.beginPath();
                 canvasCtx.arc(fingerX, fingerY, 10, 0, 2 * Math.PI);
-                canvasCtx.fillStyle = '#ff0055'; 
+                canvasCtx.fillStyle = '#ff0055';
                 canvasCtx.fill();
                 canvasCtx.strokeStyle = 'white';
                 canvasCtx.lineWidth = 2;
                 canvasCtx.stroke();
+            } else {
+                // 손이 없어지면 큐 리셋
+                gestureQueue.length = 0;
+                currentGesture = "NO_HAND";
+                document.getElementById('current-gesture').innerText = currentGesture;
             }
 
-            // === [상태 1] 메뉴 ===
             if (gameState === 'MENU') {
                 drawInteractiveButton("START", 320, 240, fingerX, fingerY, handDetected);
-            }
-            // === [상태 1.5] 카운트다운 (여기서 3, 2, 1 표시) ===
-            else if (gameState === 'COUNTDOWN') {
+            } else if (gameState === 'COUNTDOWN') {
                 processCountdown();
-            }
-            // === [상태 2] 게임 중 ===
-            else if (gameState === 'PLAYING') {
+            } else if (gameState === 'PLAYING') {
                 processGameLogic(fingerX, fingerY, handDetected);
-            }
-            // === [상태 3] 결과 ===
-            else if (gameState === 'FINISHED') {
+            } else if (gameState === 'FINISHED') {
                 drawFinishScreen(fingerX, fingerY, handDetected);
             }
 
@@ -304,34 +392,27 @@
         }
 
         function processCountdown() {
-            // 배경 약간 어둡게 (집중 효과)
             canvasCtx.fillStyle = "rgba(0, 0, 0, 0.5)";
             canvasCtx.fillRect(0, 0, 640, 480);
 
             const now = Date.now();
             const elapsed = now - countdownStartTime;
-            
-            // 3초 카운트다운
+
             if (elapsed < 1000) countdownValue = 3;
             else if (elapsed < 2000) countdownValue = 2;
             else if (elapsed < 3000) countdownValue = 1;
             else {
-                // 카운트다운 종료 -> 서버에 게임 시작 알림 & 음악 재생
                 socket.send(JSON.stringify({ 'action': 'game_start' }));
-                
-                // 음악 재생 (브라우저 정책상 사용자 인터랙션 후 재생은 허용됨)
+
                 bgm.currentTime = 0;
                 bgm.play().catch(e => console.log("Audio Play Error:", e));
-                
-                // 클라이언트 상태는 잠시 대기 (서버 응답 오면 PLAYING으로 바뀜)
                 return;
             }
 
-            // 숫자 그리기 (거울 모드 보정)
             canvasCtx.save();
             canvasCtx.translate(320, 240);
             canvasCtx.scale(-1, 1);
-            
+
             canvasCtx.fillStyle = "white";
             canvasCtx.font = "bold 150px Arial";
             canvasCtx.textAlign = "center";
@@ -339,7 +420,7 @@
             canvasCtx.shadowColor = "#00c6ff";
             canvasCtx.shadowBlur = 20;
             canvasCtx.fillText(countdownValue, 0, 0);
-            
+
             canvasCtx.restore();
         }
 
@@ -355,7 +436,7 @@
 
             canvasCtx.save();
             canvasCtx.translate(bx, by);
-            canvasCtx.scale(-1, 1); 
+            canvasCtx.scale(-1, 1);
             canvasCtx.fillStyle = 'white';
             canvasCtx.font = 'bold 30px Arial';
             canvasCtx.textAlign = 'center';
@@ -370,7 +451,7 @@
                         isHoveringBtn = true;
                         hoverStartTime = Date.now();
                     }
-                    
+
                     const elapsed = Date.now() - hoverStartTime;
                     const progress = Math.min(elapsed / BTN_HOLD_TIME, 1.0);
 
@@ -381,9 +462,8 @@
                     canvasCtx.stroke();
 
                     if (progress >= 1.0) {
-                        // [중요] 바로 시작하지 않고 카운트다운 함수 호출
                         startCountdown();
-                        isHoveringBtn = false; 
+                        isHoveringBtn = false;
                     }
                 } else {
                     isHoveringBtn = false;
@@ -399,19 +479,19 @@
             canvasCtx.fillRect(0, 0, 640, 480);
 
             canvasCtx.save();
-            canvasCtx.translate(320, 120); 
+            canvasCtx.translate(320, 120);
             canvasCtx.scale(-1, 1);
-            
+
             canvasCtx.fillStyle = "white";
             canvasCtx.font = "bold 40px Arial";
             canvasCtx.textAlign = "center";
             canvasCtx.fillText("GAME CLEAR!", 0, 0);
-            
+
             if (finalResultData) {
                 canvasCtx.font = "bold 30px Arial";
                 canvasCtx.fillStyle = "#ffff00";
                 canvasCtx.fillText(`RANK: ${finalResultData.rank}`, 0, 50);
-                
+
                 canvasCtx.fillStyle = "#00ff00";
                 canvasCtx.fillText(`SCORE: ${finalResultData.total_score}`, 0, 90);
             }
@@ -434,49 +514,57 @@
             canvasCtx.arc(targetX, targetY, TARGET_RADIUS, 0, 2 * Math.PI);
             canvasCtx.lineWidth = 4;
             canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-            canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.2)'; 
+            canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.2)';
             canvasCtx.fill();
             canvasCtx.stroke();
 
             if (timeToHit > 0 && timeToHit <= APPROACH_TIME) {
                 const progress = 1 - (timeToHit / APPROACH_TIME);
-                const startScale = 2.0; 
+                const startScale = 2.0;
                 const currentRadius = TARGET_RADIUS * (1 + (startScale - 1) * (1 - progress));
-                
+
                 canvasCtx.beginPath();
                 canvasCtx.arc(targetX, targetY, currentRadius, 0, 2 * Math.PI);
                 canvasCtx.lineWidth = 3;
-                canvasCtx.strokeStyle = `rgba(0, 255, 255, ${0.5 + progress * 0.5})`; 
+                canvasCtx.strokeStyle = `rgba(0, 255, 255, ${0.5 + progress * 0.5})`;
                 canvasCtx.stroke();
             }
 
             if (timeToHit > 0) {
                 document.getElementById('target-timer').innerText = (timeToHit / 1000).toFixed(2) + "s";
             } else if (timeToHit > -1000) {
-                 document.getElementById('target-timer').innerText = "HIT NOW!";
+                document.getElementById('target-timer').innerText = "HIT NOW!";
             }
 
             if (timeToHit < MISS_THRESHOLD) {
                 socket.send(JSON.stringify({ 'action': 'miss' }));
-                targetActive = false; 
+                targetActive = false;
                 return;
             }
 
             if (detected) {
                 const distance = Math.sqrt(Math.pow(fx - targetX, 2) + Math.pow(fy - targetY, 2));
+
                 if (distance <= TARGET_RADIUS) {
-                    socket.send(JSON.stringify({
-                        'action': 'gesture_complete',
-                        'entry_time': Date.now(),
-                        'min_dist': distance
-                    }));
-                    targetActive = false; 
-                    
-                    canvasCtx.beginPath();
-                    canvasCtx.arc(targetX, targetY, TARGET_RADIUS, 0, 2 * Math.PI);
-                    canvasCtx.fillStyle = 'rgba(0, 255, 0, 0.5)';
-                    canvasCtx.fill();
-                    canvasCtx.stroke();
+                    // 핵심: 제스처가 일치할 때만 HIT 전송
+                    if (requiredGesture && currentGesture === requiredGesture) {
+                        socket.send(JSON.stringify({
+                            'action': 'gesture_complete',
+                            'entry_time': Date.now(),
+                            'min_dist': distance,
+                            'gesture': currentGesture
+                        }));
+                        targetActive = false;
+
+                        canvasCtx.beginPath();
+                        canvasCtx.arc(targetX, targetY, TARGET_RADIUS, 0, 2 * Math.PI);
+                        canvasCtx.fillStyle = 'rgba(0, 255, 0, 0.5)';
+                        canvasCtx.fill();
+                        canvasCtx.stroke();
+                    } else {
+                        // 틀린 제스처면 아무것도 안 보내고, 시간 지나면 MISS 처리되게 둠
+                        // 원하면 여기서 즉시 BAD 처리 메시지를 보내도록 확장 가능
+                    }
                 }
             }
         }
