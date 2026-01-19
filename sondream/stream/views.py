@@ -1,6 +1,7 @@
+from urllib.parse import urlencode
 import cv2
 from django.http import StreamingHttpResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 
 # 전역으로 카메라 열어두기 (간단 버전)
 # (Windows 안정성용 CAP_DSHOW 옵션은 필요하면 추가)
@@ -37,6 +38,23 @@ def video_feed(request):
         content_type="multipart/x-mixed-replace; boundary=frame"
     )
 
+
+
+
+def login_page(request):
+    return render(request, "stream/login.html")
+
+def nickname_page(request):
+    if request.method == "POST":
+        nickname = request.POST.get("nickname", "").strip()
+
+        if nickname:
+            # ✅ query string으로 전달
+            query = urlencode({"nickname": nickname})
+            return redirect(f"/stream/?{query}")
+
+    return render(request, "stream/nickname.html")
+
 def game_page(request):
-    # templates 폴더 안에 있는 game_webcam.html을 찾아서 보여줍니다.
-    return render(request, 'game_webcam.html')
+    nickname = request.GET.get("nickname", "Guest")
+    return render(request, "game_webcam.html", {"nickname": nickname})

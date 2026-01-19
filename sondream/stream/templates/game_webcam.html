@@ -307,6 +307,27 @@
 
         const APPROACH_TIME = 1000;
         const MISS_THRESHOLD = -200;
+        // --- 고정 4개 위치(예시: 화면 4분면) ---
+        const TARGET_POSITIONS = [
+        { x: 160, y: 120 }, // 좌상
+        { x: 480, y: 120 }, // 우상
+        { x: 160, y: 360 }, // 좌하
+        { x: 480, y: 360 }, // 우하
+        ];
+        let currentTargetIdx = -1;
+        let nextTargetIdx = -1;
+        function pickNextIdx(excludeIdx) {
+        const n = TARGET_POSITIONS.length;
+        if (n <= 1) return 0;
+
+        let idx = Math.floor(Math.random() * n);
+        while (idx === excludeIdx) {
+            idx = Math.floor(Math.random() * n);
+        }
+        return idx;
+        }
+
+
 
         // 추가: 누락된 상태 변수
         let isHandInside = false;
@@ -328,6 +349,16 @@
         const GESTURES = ["OPEN_PALM", "FIST", "THUMBS_UP", "PEACE", "POINT"];
         let requiredGesture = null;
         let currentGesture = "NO_HAND";
+        function gestureDisplayLabel(g) {
+        switch (g) {
+            case "OPEN_PALM": return "🖐";     // 또는 "OPEN"
+            case "FIST":      return "✊";
+            case "THUMBS_UP": return "👍";
+            case "PEACE":     return "✌";
+            case "POINT":     return "👉";
+            default:          return "?";
+        }
+        }
 
         // 간단 안정화: 최근 N프레임 최빈값
         const gestureQueue = [];
@@ -397,15 +428,32 @@
                 gameState = 'PLAYING';
                 stats = { PERFECT: 0, GREAT: 0, GOOD: 0, BAD: 0, MISS: 0 };
                 updateStatsUI();
+                currentTargetIdx = -1;
+                nextTargetIdx = pickNextIdx(currentTargetIdx);
                 console.log("Game Started! Music Playing...");
+                
             }
 
             if (data.type === 'next_target') {
                 targetStart = data.target_start;
                 targetActive = true;
-                setRandomPosition();
 
-                // 추가: 서버가 요구하는 제스처 수신
+                // ✅ 현재 타겟 = 미리 뽑아둔 NEXT
+                currentTargetIdx = nextTargetIdx;
+
+                // (안전) 혹시 초기화가 안 되어있다면
+                if (currentTargetIdx === -1) {
+                    currentTargetIdx = pickNextIdx(-1);
+                }
+
+                // 현재 좌표 적용
+                targetX = TARGET_POSITIONS[currentTargetIdx].x;
+                targetY = TARGET_POSITIONS[currentTargetIdx].y;
+
+                // ✅ 다음 타겟 미리 뽑기 (현재와 다르게)
+                nextTargetIdx = pickNextIdx(currentTargetIdx);
+
+                // 제스처
                 requiredGesture = data.required_gesture || null;
                 document.getElementById('required-gesture').innerText = requiredGesture || "-";
             }
@@ -430,15 +478,34 @@
             }
         }
 
-        function setRandomPosition() {
-            const padding = TARGET_RADIUS + 30;
-            const maxX = 640 - padding;
-            const maxY = 480 - padding;
-            const minX = padding;
-            const minY = padding;
-            targetX = Math.random() * (maxX - minX) + minX;
-            targetY = Math.random() * (maxY - minY) + minY;
+        function refillPosBag() {
+        posBag = [0, 1, 2, 3];
+        // Fisher-Yates shuffle
+        for (let i = posBag.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [posBag[i], posBag[j]] = [posBag[j], posBag[i]];
         }
+        }
+
+        function setRandomPosition() {
+        if (!TARGET_POSITIONS || TARGET_POSITIONS.length === 0) return;
+
+        let idx = Math.floor(Math.random() * TARGET_POSITIONS.length);
+
+        // 바로 이전 위치와 같으면 다시 뽑기
+        if (TARGET_POSITIONS.length > 1) {
+            while (idx === lastTargetIdx) {
+            idx = Math.floor(Math.random() * TARGET_POSITIONS.length);
+            }
+        }
+
+        lastTargetIdx = idx;
+        targetX = TARGET_POSITIONS[idx].x;
+        targetY = TARGET_POSITIONS[idx].y;
+        }
+
+
+
 
         function showResult(res) {
             document.getElementById('score').innerText = res.total_score;
@@ -738,11 +805,50 @@
 
             const currentTime = Date.now();
             const timeToHit = targetStart - currentTime;
+            
+            // 0) 좌표 유효성
+            if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) return;
 
-            // --- [1] 타겟 원 그리기 (Neon Line Style) ---
+            // --- 현재 ↔ 다음 연결선 ---
+            if (nextTargetIdx !== -1 && currentTargetIdx !== -1) {
+            const nx = TARGET_POSITIONS[nextTargetIdx].x;
+            const ny = TARGET_POSITIONS[nextTargetIdx].y;
+
             canvasCtx.save();
             canvasCtx.beginPath();
+            canvasCtx.moveTo(targetX, targetY);
+            canvasCtx.lineTo(nx, ny);
+            canvasCtx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+            canvasCtx.lineWidth = 4;
+            canvasCtx.setLineDash([10, 8]);
+            canvasCtx.stroke();
+            canvasCtx.restore();
+            }
+            if (nextTargetIdx !== -1) {
+                const nx = TARGET_POSITIONS[nextTargetIdx].x;
+                const ny = TARGET_POSITIONS[nextTargetIdx].y;
+
+                canvasCtx.save();
+                canvasCtx.beginPath();
+                canvasCtx.arc(nx, ny, TARGET_RADIUS * 0.85, 0, 2 * Math.PI);
+                canvasCtx.strokeStyle = "rgba(0, 255, 255, 0.30)";
+                canvasCtx.lineWidth = 3;
+                canvasCtx.setLineDash([6, 10]);
+                canvasCtx.stroke();
+                canvasCtx.restore();
+            }
+
+
+            // 2) 타겟 원(항상 실선으로 리셋)
+            canvasCtx.setLineDash([]);
+            canvasCtx.beginPath();
             canvasCtx.arc(targetX, targetY, TARGET_RADIUS, 0, 2 * Math.PI);
+            canvasCtx.lineWidth = 4;
+            canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            canvasCtx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            canvasCtx.fill();
+            canvasCtx.stroke();
+
 
             if (isHandInside) {
                 // 손이 들어왔을 때: Green Glow + Thick Line
@@ -762,6 +868,31 @@
 
             canvasCtx.fill();
             canvasCtx.stroke();
+            // --- 타겟 원 안에 "요구 제스처" 표시 ---
+            if (requiredGesture) {
+            canvasCtx.save();
+            canvasCtx.translate(targetX, targetY);
+            canvasCtx.scale(-1, 1);
+
+            const req = gestureDisplayLabel(requiredGesture);
+            const cur = gestureDisplayLabel(currentGesture);
+
+            canvasCtx.textAlign = "center";
+            canvasCtx.textBaseline = "middle";
+            canvasCtx.shadowColor = "rgba(0,0,0,0.8)";
+            canvasCtx.shadowBlur = 6;
+
+            canvasCtx.fillStyle = "white";
+            canvasCtx.font = "bold 40px Arial";
+            canvasCtx.fillText(req, 0, -8);
+
+            canvasCtx.fillStyle = "#ffcc00";
+            canvasCtx.font = "bold 22px Arial";
+            canvasCtx.fillText(`YOU: ${cur}`, 0, 28);
+
+            canvasCtx.restore();
+            }
+
 
             // 내부 디테일 라인 (선명한 흰색 실선)
             canvasCtx.shadowBlur = 0;
